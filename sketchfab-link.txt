@@ -1,0 +1,10 @@
+STORY_LINK(`
+
+  Paste your Sketchfab model link on the line below, replacing
+  PASTE-YOUR-LINK-HERE. Then save this file.
+
+  https://sketchfab.com/3d-models/g1-robot-ae7031d6894647aabe35b1131d4eddf9
+
+  (Keep the first and last lines of this file exactly as they are.)
+
+`);
