@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Story</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+
+<!--
+  =====================================================================
+  Interactive 3D Story player
+  © 2026 Iman Jalilvand. All rights reserved.
+
+  STUDENTS: you do not need to edit this file.
+  - Paste your Sketchfab link into sketchfab-link.txt.
+  - Write your annotations, intro and credits in Sketchfab.
+  - Put your media files (and optional background.mp3) next to this file.
+  =====================================================================
+-->
+
+<style>
+:root {
+  --ink: #16202a;
+  --paper: #ffffff;
+  --muted: #5b6875;
+  --line: #e3e8ec;
+  --accent: #0e6b70;
+  --accent-soft: #e4f1f1;
+  --danger: #a3341f;
+  --focus: #f2b233;
+  --glass: rgba(255,255,255,.60);
+  --font: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #1b1f23; font-family: var(--font); color: var(--ink); }
+body { overflow: hidden; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+#viewer { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* ---------- story points checklist (left) ---------- */
+#points {
+  position: fixed; top: calc(72px + env(safe-area-inset-top, 0px)); left: 16px; z-index: 11;
+  width: min(290px, calc(100vw - 32px));
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid rgba(255,255,255,.55);
+  border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+#ptToggle {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  background: transparent; border: 0; padding: 12px 14px; color: var(--ink); text-align: left; border-radius: 14px;
+}
+.pt-head { flex: 1; font-weight: 700; font-size: 15px; }
+#ptCount { font-size: 13px; font-weight: 700; background: var(--ink); color: #fff; border-radius: 999px; padding: 2px 9px; font-variant-numeric: tabular-nums; }
+#ptCount.done { background: #1c6b36; }
+.chev { transition: transform .2s; }
+#ptToggle[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.pt-bar { height: 4px; margin: 0 14px 6px; background: rgba(22,32,42,.15); border-radius: 4px; overflow: hidden; }
+#ptFill { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+#ptList { list-style: none; margin: 0; padding: 2px 6px; max-height: min(46vh, 380px); overflow: auto; }
+.pt-item {
+  width: 100%; display: flex; align-items: center; gap: 10px; border: 0; background: transparent;
+  padding: 7px 8px; border-radius: 8px; text-align: left; color: var(--ink);
+}
+.pt-item:hover { background: rgba(255,255,255,.55); }
+.pt-item[aria-current="true"] { background: rgba(255,255,255,.8); box-shadow: inset 3px 0 0 var(--accent); }
+.box {
+  flex: none; width: 20px; height: 20px; border-radius: 5px; border: 2px solid rgba(22,32,42,.55);
+  display: grid; place-items: center; background: rgba(255,255,255,.7); color: transparent;
+}
+.pt-item.seen .box { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pt-num { flex: none; font-weight: 700; font-size: 13px; color: var(--muted); width: 18px; text-align: right; }
+.pt-name { flex: 1; min-width: 0; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.pt-item.seen .pt-name { color: #34414d; }
+#ptDone { margin: 4px 14px 0; font-size: 13px; line-height: 1.4; color: #134d26; font-weight: 700; }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.pt-foot { display: flex; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid rgba(22,32,42,.12); margin-top: 6px; }
+.chip {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; border-radius: 8px; padding: 7px 8px; font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,.75); color: var(--ink);
+}
+.chip:hover { background: #fff; }
+#ptConfirm { padding: 10px 14px 12px; border-top: 1px solid rgba(22,32,42,.12); font-size: 14px; line-height: 1.4; }
+#ptConfirm .row { display: flex; gap: 6px; margin-top: 8px; }
+.chip.solid { background: var(--ink); color: #fff; }
+
+/* ---------- right-hand story card ---------- */
+#stack {
+  position: fixed; top: calc(72px + env(safe-area-inset-top, 0px)); right: 16px;
+  width: min(360px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 10px; z-index: 10; pointer-events: none;
+}
+#stack > * { pointer-events: auto; }
+.card { background: var(--paper); border-radius: 14px; box-shadow: 0 14px 44px rgba(0,0,0,.38); max-height: calc(100vh - 220px); overflow: auto; }
+.card-head { display: flex; gap: 12px; align-items: flex-start; padding: 16px 16px 0; }
+.badge {
+  flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 700; font-size: 14px;
+  display: grid; place-items: center; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink);
+}
+.card-title { flex: 1; margin: 3px 0 0; font-size: 19px; line-height: 1.25; font-weight: 700; }
+.icon-btn { flex: none; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); display: grid; place-items: center; }
+.icon-btn:hover { background: #f0f3f5; color: var(--ink); }
+.card-body { padding: 8px 16px 4px 58px; font-size: 15px; line-height: 1.55; color: #2b3640; }
+.card-body p { margin: 0 0 10px; }
+.card-body:empty { display: none; }
+.media { list-style: none; margin: 8px 0 0; padding: 0 8px 8px; }
+.media li + li { border-top: 1px solid var(--line); }
+.media-btn { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 8px; border: 0; background: transparent; text-align: left; border-radius: 10px; color: var(--ink); }
+.media-btn:hover { background: #f4f7f8; }
+.media-ico { flex: none; width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.media-btn[aria-pressed="true"] .media-ico { background: var(--accent); color: #fff; }
+.media-text { flex: 1; min-width: 0; }
+.media-label { display: block; font-weight: 700; font-size: 15px; overflow-wrap: anywhere; }
+.media-kind { display: block; font-size: 13px; color: var(--muted); }
+
+/* ---------- narration player ---------- */
+#player { background: var(--ink); color: #fff; border-radius: 14px; padding: 10px 10px 10px 12px; display: flex; align-items: center; gap: 10px; box-shadow: 0 14px 44px rgba(0,0,0,.38); }
+#player .round { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; background: #fff; color: var(--ink); display: grid; place-items: center; }
+#player .stop { background: transparent; color: #c9d3db; width: 34px; height: 34px; }
+#player .stop:hover { color: #fff; background: rgba(255,255,255,.12); }
+.p-main { flex: 1; min-width: 0; }
+#pName { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-row { display: flex; align-items: center; gap: 8px; }
+#pSeek { flex: 1; accent-color: #5fc3c8; height: 18px; margin: 0; }
+#pTime { font-size: 12px; color: #c9d3db; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#pMsg { font-size: 13px; color: #ffd9cf; line-height: 1.4; }
+
+/* ---------- background music control ---------- */
+#music {
+  position: fixed; left: 16px; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); z-index: 11;
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px;
+  background: var(--glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.55); border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+#mBtn { width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--ink); color: #fff; display: grid; place-items: center; }
+#mBtn[aria-pressed="false"] { background: rgba(255,255,255,.85); color: var(--ink); }
+.m-label { font-size: 13px; font-weight: 700; }
+#mVol { width: 96px; accent-color: var(--accent); }
+
+/* ---------- popups ---------- */
+.overlay { position: fixed; inset: 0; z-index: 100; background: rgba(8,12,16,.84); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.m-box { width: min(960px, 100%); max-height: 100%; display: flex; flex-direction: column; }
+.m-head { display: flex; align-items: center; gap: 12px; color: #fff; padding: 0 0 10px; }
+.m-title { flex: 1; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.m-close { flex: none; display: flex; align-items: center; gap: 6px; border: 0; background: #fff; color: var(--ink); border-radius: 999px; padding: 8px 14px 8px 10px; font-weight: 700; }
+#stage { background: #000; border-radius: 12px; overflow: hidden; display: flex; justify-content: center; }
+#stage video, #stage img { display: block; max-width: 100%; max-height: calc(100vh - 120px); }
+#stage video { width: 100%; }
+#stage iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; max-height: calc(100vh - 120px); }
+.m-error { color: #fff; padding: 40px 28px; font-size: 16px; line-height: 1.5; max-width: 560px; }
+.m-error strong { color: #ffd9cf; }
+.sheet { background: #fff; border-radius: 12px; padding: 8px 20px 20px; overflow: auto; max-height: calc(100vh - 120px); font-size: 15px; line-height: 1.55; }
+.sheet h3 { font-size: 15px; margin: 16px 0 6px; }
+.sheet ul { margin: 0; padding: 0; list-style: none; }
+.sheet li { padding: 4px 0; display: flex; gap: 8px; line-height: 1.4; }
+.sheet p { margin: 0 0 10px; }
+.sheet a, .intro-text a { color: var(--accent); font-weight: 700; }
+.ok { color: #1c6b36; font-weight: 700; } .bad { color: var(--danger); font-weight: 700; } .meh { color: var(--muted); font-weight: 700; }
+.fine { color: var(--muted); font-size: 13px; }
+
+/* ---------- start + intro screens ---------- */
+.screen { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; overflow: auto; }
+#setup { background: #1b1f23; }
+#intro { background: rgba(14,18,22,.86); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); z-index: 90; }
+.start-box, .intro-box { width: min(560px, 100%); background: var(--paper); border-radius: 16px; padding: 28px; }
+.start-box h1 { margin: 0 0 8px; font-size: 26px; line-height: 1.2; }
+.start-box p { margin: 0 0 18px; color: var(--muted); line-height: 1.5; }
+.primary { border: 0; border-radius: 10px; padding: 12px 20px; background: var(--accent); color: #fff; font-weight: 700; font-size: 16px; }
+.primary:disabled { background: #9aa6b0; cursor: progress; }
+#setupMsg { color: var(--danger); font-weight: 700; }
+.steps { margin: 0 0 20px; padding-left: 20px; line-height: 1.55; }
+.steps li { margin-bottom: 6px; }
+.copyright { width: min(560px, 100%); margin: 0; color: #fff; font-size: 13px; line-height: 1.5; text-align: center; }
+
+.eyebrow { margin: 0 0 6px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+#iTitle { margin: 0; font-size: 28px; line-height: 1.2; overflow-wrap: anywhere; }
+#iBy { margin: 6px 0 0; color: var(--muted); }
+.intro-text { margin: 16px 0 0; line-height: 1.55; max-height: 30vh; overflow: auto; }
+.intro-text p { margin: 0 0 10px; }
+.how { list-style: none; margin: 18px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line); display: grid; gap: 8px; font-size: 14px; color: #34414d; }
+.how li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.4; }
+.how svg { flex: none; color: var(--accent); margin-top: 1px; }
+.intro-foot { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 20px; }
+#iMeta { flex: 1; font-size: 13px; color: var(--muted); }
+#iExtra { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); line-height: 1.6; }
+#iExtra .row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+
+#notice {
+  position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
+  z-index: 120; width: min(560px, calc(100vw - 32px)); background: #fff4dc; color: #3d2c00; border-radius: 12px;
+  padding: 14px 44px 14px 16px; line-height: 1.45; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+#notice .icon-btn { position: absolute; top: 8px; right: 8px; color: #3d2c00; }
+
+@media (max-width: 640px) {
+  #points { top: calc(60px + env(safe-area-inset-top, 0px)); left: 8px; width: min(260px, calc(100vw - 16px)); }
+  #stack { top: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); right: 8px; left: 8px; width: auto; }
+  .card { max-height: 44vh; }
+  .card-body { padding-left: 16px; }
+  #music { left: auto; right: 8px; bottom: auto; top: calc(60px + env(safe-area-inset-top, 0px)); }
+  #mVol { width: 70px; }
+  .overlay { padding: 12px; }
+  .start-box, .intro-box { padding: 22px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .card, #player { animation: rise .18s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+</style>
+</head>
+
+<body>
+
+<iframe id="viewer" title="3D model" allow="autoplay; fullscreen; xr-spatial-tracking"
+        allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>
+
+<!-- Story points checklist -->
+<nav id="points" hidden aria-label="Story points">
+  <button id="ptToggle" aria-expanded="true" aria-controls="ptBody">
+    <span class="pt-head">Story points</span>
+    <span id="ptCount">0 / 0</span>
+    <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+  </button>
+  <div id="ptBody">
+    <div class="pt-bar"><div id="ptFill"></div></div>
+    <ol id="ptList"></ol>
+    <p id="ptDone" hidden>All points explored. <button class="linkish" id="ptDoneCredits">View credits</button></p>
+    <div class="pt-foot" id="ptFoot">
+      <button class="chip" id="ptReset" title="Clear checkmarks and go back to point 1">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
+      <button class="chip" id="ptCredits">Credits</button>
+      <button class="chip" id="ptHelp" aria-label="Help">Help</button>
+    </div>
+    <div id="ptConfirm" hidden>
+      Clear all checkmarks and go back to point 1?
+      <div class="row">
+        <button class="chip solid" id="ptYes">Yes, reset</button>
+        <button class="chip" id="ptNo">Cancel</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Story card + narration player -->
+<div id="stack">
+  <article class="card" id="card" hidden aria-live="polite">
+    <div class="card-head">
+      <div class="badge" id="cNum">1</div>
+      <h2 class="card-title" id="cTitle"></h2>
+      <button class="icon-btn" id="cClose" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="card-body" id="cBody"></div>
+    <ul class="media" id="cMedia"></ul>
+  </article>
+  <div id="player" hidden>
+    <button class="round" id="pPlay" aria-label="Pause"></button>
+    <div class="p-main">
+      <div id="pName"></div>
+      <div class="p-row" id="pRow">
+        <input type="range" id="pSeek" min="0" max="1000" value="0" aria-label="Seek">
+        <span id="pTime">0:00</span>
+      </div>
+      <div id="pMsg" hidden></div>
+    </div>
+    <button class="round stop" id="pStop" aria-label="Stop sound">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Background music control -->
+<div id="music" hidden>
+  <button id="mBtn" aria-pressed="true" aria-label="Background music on. Press to turn off" title="Music on/off (M)"></button>
+  <span class="m-label" aria-hidden="true">Music</span>
+  <input type="range" id="mVol" min="0" max="100" aria-label="Background music volume">
+</div>
+
+<!-- Media popup -->
+<div id="modal" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="m-box">
+    <div class="m-head">
+      <div class="m-title" id="mTitle"></div>
+      <button class="m-close" id="mClose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>Close</button>
+    </div>
+    <div id="stage"></div>
+  </div>
+</div>
+
+<!-- Text sheet popup: credits, file check -->
+<div id="sheetWrap" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="sTitle">
+  <div class="m-box" style="width:min(640px,100%)">
+    <div class="m-head">
+      <div class="m-title" id="sTitle"></div>
+      <button class="m-close" id="sClose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>Close</button>
+    </div>
+    <div class="sheet" id="sBody"></div>
+  </div>
+</div>
+
+<!-- Setup screen: shown only when the link file is missing or unreadable -->
+<section id="setup" class="screen" hidden>
+  <div class="start-box">
+    <h1>Add your Sketchfab link</h1>
+    <p id="setupMsg"></p>
+    <ol class="steps">
+      <li>In this folder, open <strong>sketchfab-link.txt</strong> with Notepad (Windows) or TextEdit (Mac).</li>
+      <li>Paste your model link on the line shown in the file. Keep the first and last lines as they are.</li>
+      <li>Save the file, then reload this page.</li>
+    </ol>
+    <button class="primary" id="setupReload">Reload page</button>
+  </div>
+  <p class="copyright">
+    © 2026 Iman Jalilvand. All rights reserved.<br>
+    Do not reproduce, copy, or distribute without the written permission of the copyright owner.
+  </p>
+</section>
+
+<!-- Intro / help screen -->
+<section id="intro" class="screen" hidden role="dialog" aria-modal="true" aria-labelledby="iTitle">
+  <div class="intro-box">
+    <p class="eyebrow">Interactive 3D story</p>
+    <h1 id="iTitle">Loading…</h1>
+    <p id="iBy"></p>
+    <div class="intro-text" id="iText"></div>
+    <ul class="how">
+      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Click the <strong>numbered points</strong> on the model to open each part of the story.</span></li>
+      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span><strong>Drag</strong> to turn the model, <strong>scroll or pinch</strong> to zoom.</span></li>
+      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span><strong>Story points</strong> (top left) ticks off each point you've seen.</span></li>
+    </ul>
+    <div class="intro-foot">
+      <div id="iMeta" aria-live="polite"></div>
+      <button class="primary" id="iBegin" disabled>Loading model…</button>
+    </div>
+    <div id="iExtra" hidden>
+      <div class="row"><span>Keyboard: <strong>Esc</strong> closes pop-ups · <strong>M</strong> music on/off</span></div>
+      <div class="row">
+        <button class="linkish" id="btnCheck">Check my annotations</button>
+        <button class="linkish" id="btnCopy" hidden>Copy share link</button>
+      </div>
+    </div>
+  </div>
+  <p class="copyright">
+    © 2026 Iman Jalilvand. All rights reserved.<br>
+    Do not reproduce, copy, or distribute without the written permission of the copyright owner.
+  </p>
+</section>
+
+<div id="notice" hidden role="alert">
+  <div id="noticeText"></div>
+  <button class="icon-btn" id="noticeClose" aria-label="Dismiss"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
+
+<!-- Reads the student's link from sketchfab-link.txt (works when the page is opened by double-clicking) -->
+<script>window.STORY_LINK = function (text) { window.__storyLinkText = String(text); };</script>
+<script src="sketchfab-link.txt" onload="window.__storyLinkLoaded = true" onerror="window.__storyLinkMissing = true"></script>
+
+<script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
+
+<script>
+/* =====================================================================
+   SETTINGS (optional)
+   ===================================================================== */
+
+/* Students put their Sketchfab link in sketchfab-link.txt, not here. */
+
+/* Background music: put a file named background.mp3 (or .m4a/.ogg/.wav)
+   next to this file. Or write a different file name or web link here. */
+const MUSIC_FILE = "";
+
+/* Default music volume, 0 (silent) to 100 (full). */
+const MUSIC_VOLUME = 30;
+
+/* How quiet the music gets while narration or a video plays, 0 to 100
+   (percent of the music volume). */
+const MUSIC_DUCK = 20;
+
+
+/* ===================== nothing below needs editing ===================== */
+(function () {
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+
+const ICONS = {
+  audio: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>',
+  video: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="14" height="13" rx="2"/><path d="M16.5 10l5-3v10l-5-3"/></svg>',
+  image: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
+  link:  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>',
+  play:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>',
+  pause: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>',
+  noteOn:  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  noteOff: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M3 3l18 18"/></svg>',
+  check: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>'
+};
+const KIND_TEXT = { audio: "Sound", video: "Video", image: "Image", link: "Web page" };
+
+const KIND = {
+  audio: "audio", sound: "audio", music: "audio", narration: "audio", voice: "audio",
+  video: "video", movie: "video",
+  image: "image", img: "image", photo: "image", picture: "image", pic: "image",
+  link: "link", web: "link", website: "link", url: "link", page: "link", pdf: "link"
+};
+const TAG_RE  = new RegExp("\\[\\s*(" + Object.keys(KIND).join("|") + ")\\s*:\\s*([^\\]]+?)\\s*\\]", "gi");
+const ANY_TAG = /\[\s*([a-z]+)\s*:\s*([^\]]+?)\s*\]/gi;
+const MD_IMG  = /!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
+const MD_LINK = /\[([^\]]+)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
+const BARE_URL = /\bhttps?:\/\/[^\s<>()\[\]]+[^\s<>()\[\].,;:!?'"]/gi;
+
+const state = {
+  api: null, ready: false, begun: false, modelId: null,
+  list: [], current: -1, visited: new Set(),
+  info: null, audioKey: null, audioFile: null,
+  duckAudio: false, duckModal: false
+};
+
+function store(key, value) {
+  try {
+    if (value === undefined) { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) { return null; }
+}
+
+/* ================================================================== */
+/* Start-up                                                            */
+/* ================================================================== */
+function findModelId(text) {
+  const m = String(text || "").match(/[a-f0-9]{32}/i);
+  return m ? m[0].toLowerCase() : null;
+}
+
+function boot() {
+  detectMusic();
+  const fileText = window.__storyLinkText;
+  const id = findModelId(fileText) || findModelId(new URLSearchParams(location.search).get("model"));
+  if (id) { loadModel(id); return; }
+
+  if (window.__storyLinkMissing || (!window.__storyLinkLoaded && fileText === undefined)) {
+    showSetup("The file sketchfab-link.txt wasn't found. It must be in the same folder as index.html.");
+  } else if (fileText === undefined) {
+    showSetup("sketchfab-link.txt couldn't be read. The first or last line may have been changed or deleted.");
+  } else if (/sketchfab\.com|skfb\.ly/i.test(fileText)) {
+    showSetup("The link in sketchfab-link.txt doesn't include a model ID. Copy the full link from your browser's address bar while viewing your model.");
+  } else {
+    showSetup("sketchfab-link.txt doesn't contain a Sketchfab link yet.");
+  }
+}
+
+function showSetup(message) {
+  $("intro").hidden = true;
+  $("setupMsg").textContent = message;
+  $("setup").hidden = false;
+  setTimeout(() => $("setupReload").focus(), 50);
+}
+$("setupReload").addEventListener("click", () => location.reload());
+
+function loadModel(id) {
+  state.modelId = id;
+  state.visited = new Set(store("story-progress-" + id) || []);
+  openIntro("intro");
+  loadModelInfo(id);
+
+  if (typeof window.Sketchfab !== "function") {
+    setBegin(false, "Can't load");
+    notice("The Sketchfab viewer could not be downloaded. Check your internet connection, then reload the page.");
+    return;
+  }
+
+  const client = new window.Sketchfab("1.12.1", $("viewer"));
+  client.init(id, {
+    autostart: 1,
+    preload: 1,
+    annotation_tooltip_visible: 0,
+    success: function (api) {
+      state.api = api;
+      api.addEventListener("viewerready", onViewerReady);
+      api.addEventListener("annotationSelect", onAnnotationSelect);
+      api.start();
+    },
+    error: function () {
+      showSetup("This model couldn't be opened. Check the link in sketchfab-link.txt, and make sure the model is published on Sketchfab (not a draft or private).");
+    }
+  });
+
+  setTimeout(() => {
+    if (!state.ready && location.protocol === "file:") {
+      notice("<strong>The model is taking a long time to load.</strong> Check your internet connection. If it still doesn't load, open this page in Chrome or Edge.");
+    }
+  }, 12000);
+}
+
+function onViewerReady() {
+  state.ready = true;
+  try { state.api.hideAnnotationTooltips(function () {}); } catch (e) {}
+  state.api.getAnnotationList(function (err, list) {
+    state.list = (!err && Array.isArray(list)) ? list : [];
+    [...state.visited].forEach((i) => { if (i >= state.list.length) state.visited.delete(i); });
+    renderPoints();
+    renderIntroMeta();
+    setBegin(true);
+    if (!state.list.length) notice("This model has no annotations yet. Add them in Sketchfab: Edit 3D Settings, then Annotations.");
+  });
+}
+
+/* ================================================================== */
+/* Intro, help and credits                                             */
+/* ================================================================== */
+async function loadModelInfo(id) {
+  const fallback = { name: "", author: "", description: "", license: "", url: "https://sketchfab.com/3d-models/" + id };
+  try {
+    const r = await fetch("https://api.sketchfab.com/v3/models/" + id);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const lic = d.license;
+    state.info = {
+      name: d.name || "",
+      author: (d.user && (d.user.displayName || d.user.username)) || "",
+      description: d.description || "",
+      license: typeof lic === "string" ? lic : (lic && (lic.label || lic.fullName || lic.slug)) || "",
+      url: d.viewerUrl || fallback.url
+    };
+  } catch (e) {
+    state.info = fallback;
+  }
+  document.title = state.info.name || "3D Story";
+  renderIntro();
+}
+
+/* Model description: everything before a line starting with "Credits" is the
+   intro; everything after it is the credits. */
+function splitDescription(desc) {
+  const text = String(desc || "").replace(/\r\n?/g, "\n");
+  const m = text.match(/^[ \t#*_>-]*(credits|sources|references|attributions?)\b[ \t*_]*:?[ \t*_]*/im);
+  if (!m) return { intro: text.trim(), credits: "" };
+  return { intro: text.slice(0, m.index).trim(), credits: text.slice(m.index + m[0].length).trim() };
+}
+
+function renderIntro() {
+  const info = state.info || {};
+  const parts = splitDescription(info.description);
+  $("iTitle").textContent = info.name || "3D Story";
+  $("iBy").textContent = info.author ? "by " + info.author : "";
+  $("iBy").hidden = !info.author;
+  $("iText").innerHTML = renderRich(parts.intro);
+  $("iText").hidden = !parts.intro;
+}
+
+function renderIntroMeta() {
+  const bits = [];
+  if (state.ready) bits.push(state.list.length + (state.list.length === 1 ? " story point" : " story points"));
+  if (music.found) bits.push("background music");
+  $("iMeta").textContent = bits.join(" · ");
+}
+
+function setBegin(ready, label) {
+  const b = $("iBegin");
+  b.disabled = !ready;
+  b.textContent = label || (ready ? (state.begun ? "Continue" : "Begin") : "Loading model…");
+}
+
+function openIntro(mode) {
+  $("iExtra").hidden = mode !== "help";
+  $("btnCopy").hidden = !/^https?:$/.test(location.protocol);
+  if (state.ready) setBegin(true);
+  $("intro").hidden = false;
+  setTimeout(() => { if (!$("iBegin").disabled) $("iBegin").focus(); }, 50);
+}
+
+$("iBegin").addEventListener("click", () => {
+  $("intro").hidden = true;
+  if (!state.begun) {
+    state.begun = true;
+    $("points").hidden = false;
+    setCollapsed(!!(window.matchMedia && window.matchMedia("(max-width: 640px)").matches));
+  }
+  startMusic();
+});
+
+function showSheet(title, html) {
+  $("sTitle").textContent = title;
+  $("sBody").innerHTML = html;
+  $("sheetWrap").hidden = false;
+  $("sClose").focus();
+}
+$("sClose").addEventListener("click", () => { $("sheetWrap").hidden = true; });
+$("sheetWrap").addEventListener("click", (e) => { if (e.target === $("sheetWrap")) $("sheetWrap").hidden = true; });
+
+function showCredits() {
+  const info = state.info || {};
+  const parts = splitDescription(info.description);
+  let html = "";
+  html += parts.credits
+    ? renderRich(parts.credits)
+    : '<p class="fine">No credits added yet. Students: at the end of your Sketchfab model description, add a line starting with <strong>Credits:</strong> and list your sources under it.</p>';
+
+  html += "<h3>3D model</h3><p>" + esc(info.name || "Untitled model") +
+          (info.author ? " by " + esc(info.author) : "") +
+          (info.license ? " · " + esc(info.license) : "") +
+          ' · <a href="' + esc(info.url || "#") + '" target="_blank" rel="noopener">View on Sketchfab</a></p>';
+
+  const media = [];
+  state.list.forEach((a, i) => parseAnnotation(a, i).items.forEach((it) => {
+    const key = it.kind + "|" + it.src;
+    if (!media.some((m) => m.key === key)) media.push({ key: key, kind: it.kind, src: it.src });
+  }));
+  if (music.found) media.push({ kind: "audio", src: music.src + " (background music)" });
+  if (media.length) {
+    html += "<h3>Media in this story</h3><ul>" + media.map((m) =>
+      "<li><span class='meh'>" + KIND_TEXT[m.kind] + ":</span><span>" + esc(m.src) + "</span></li>").join("") + "</ul>";
+  }
+  showSheet("Credits", html);
+}
+
+/* ================================================================== */
+/* Story points checklist                                              */
+/* ================================================================== */
+function renderPoints() {
+  const ol = $("ptList");
+  ol.innerHTML = "";
+  state.list.forEach((a, i) => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.className = "pt-item";
+    b.dataset.i = i;
+    b.innerHTML = '<span class="box" aria-hidden="true">' + ICONS.check + '</span>' +
+                  '<span class="pt-num">' + (i + 1) + '</span>' +
+                  '<span class="pt-name">' + esc(titleOf(a, i)) + '</span>' +
+                  '<span class="sr seen-sr"></span>';
+    b.addEventListener("click", () => goTo(i));
+    li.appendChild(b);
+    ol.appendChild(li);
+  });
+  updatePoints();
+}
+
+function updatePoints() {
+  const total = state.list.length;
+  const seen = [...state.visited].filter((i) => i < total).length;
+  document.querySelectorAll(".pt-item").forEach((b) => {
+    const i = +b.dataset.i;
+    const v = state.visited.has(i);
+    b.classList.toggle("seen", v);
+    b.setAttribute("aria-current", i === state.current ? "true" : "false");
+    b.querySelector(".seen-sr").textContent = v ? ", seen" : ", not seen yet";
+  });
+  $("ptCount").textContent = seen + " / " + total;
+  $("ptCount").classList.toggle("done", total > 0 && seen === total);
+  $("ptFill").style.width = total ? (seen / total * 100) + "%" : "0";
+  $("ptDone").hidden = !(total > 0 && seen === total);
+}
+
+function markVisited(i) {
+  state.visited.add(i);
+  store("story-progress-" + state.modelId, [...state.visited]);
+  updatePoints();
+}
+
+function goTo(i) {
+  if (!state.api) return;
+  try { state.api.gotoAnnotation(i, { preventCameraAnimation: false, preventCameraMove: false }, function () {}); } catch (e) {}
+  onAnnotationSelect(i);
+}
+
+function setCollapsed(c) {
+  $("ptToggle").setAttribute("aria-expanded", c ? "false" : "true");
+  $("ptBody").hidden = c;
+}
+$("ptToggle").addEventListener("click", () => setCollapsed($("ptToggle").getAttribute("aria-expanded") === "true"));
+
+$("ptReset").addEventListener("click", () => { $("ptFoot").hidden = true; $("ptConfirm").hidden = false; $("ptNo").focus(); });
+$("ptNo").addEventListener("click", () => { $("ptConfirm").hidden = true; $("ptFoot").hidden = false; $("ptReset").focus(); });
+$("ptYes").addEventListener("click", () => {
+  $("ptConfirm").hidden = true; $("ptFoot").hidden = false;
+  stopAudio(); closeModal();
+  state.visited.clear();
+  state.current = -1;
+  store("story-progress-" + state.modelId, []);
+  updatePoints();
+  if (state.list.length) goTo(0);
+});
+$("ptCredits").addEventListener("click", showCredits);
+$("ptDoneCredits").addEventListener("click", showCredits);
+$("ptHelp").addEventListener("click", () => openIntro("help"));
+
+/* ================================================================== */
+/* Annotation → card                                                   */
+/* ================================================================== */
+function onAnnotationSelect(index) {
+  if (typeof index !== "number" || index < 0 || !state.api) return;
+  if (index !== state.current) stopAudio();
+  state.current = index;
+  markVisited(index);
+
+  state.api.getAnnotation(index, function (err, annotation) {
+    const a = (!err && annotation) ? annotation : state.list[index];
+    if (!a || index !== state.current) return;
+    showCard(parseAnnotation(a, index));
+  });
+}
+
+function titleOf(a, i) { return ((a && (a.name || a.title)) || "").trim() || ("Point " + (i + 1)); }
+
+function annotationText(a) {
+  const c = a.content != null ? a.content : a.description;
+  if (typeof c === "string") return c;
+  if (c && typeof c.raw === "string") return c.raw;
+  if (c && typeof c.rendered === "string") return htmlToText(c.rendered);
+  return "";
+}
+
+function htmlToText(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("a[href]").forEach((a) => a.replaceWith("[" + a.textContent + "](" + a.getAttribute("href") + ")"));
+  doc.querySelectorAll("br").forEach((b) => b.replaceWith("\n"));
+  doc.querySelectorAll("p, div, li").forEach((p) => p.append("\n\n"));
+  return doc.body.textContent || "";
+}
+
+function cleanSrc(s) {
+  return String(s).trim().replace(/\\([_*\[\]()~`#])/g, "$1").replace(/^<|>$/g, "").trim();
+}
+
+function parseAnnotation(a, index) {
+  const items = [], unknown = [];
+  let text = annotationText(a).replace(/\r\n?/g, "\n");
+
+  text = text.replace(TAG_RE, (all, word, rest) => {
+    const parts = rest.split("|");
+    const src = cleanSrc(parts[0]);
+    if (src) items.push({ kind: KIND[word.toLowerCase()], src: src, label: parts.slice(1).join("|").trim() });
+    return "";
+  });
+  text = text.replace(ANY_TAG, (all, word) => { unknown.push(word); return all; });
+  text = text.replace(MD_IMG, (all, alt, url) => { items.push({ kind: "image", src: cleanSrc(url), label: alt.trim() }); return ""; });
+  text = text.replace(MD_LINK, (all, label, url) => { items.push({ kind: guessKind(url), src: cleanSrc(url), label: label.trim() }); return label; });
+  text = text.replace(BARE_URL, (url) => { items.push({ kind: guessKind(url), src: cleanSrc(url), label: "" }); return ""; });
+  items.forEach((it) => { if (!it.label) it.label = niceName(it.src, it.kind); });
+
+  return {
+    number: index + 1,
+    title: titleOf(a, index),
+    text: text.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim(),
+    items: items, unknown: unknown
+  };
+}
+
+function guessKind(src) {
+  const s = src.toLowerCase().split(/[?#]/)[0];
+  if (/\.(mp3|m4a|wav|ogg|oga|aac|flac)$/.test(s)) return "audio";
+  if (/\.(mp4|webm|mov|m4v|ogv)$/.test(s)) return "video";
+  if (/\.(jpe?g|png|gif|webp|avif|svg)$/.test(s)) return "image";
+  if (/youtube\.com|youtu\.be|vimeo\.com/.test(s)) return "video";
+  return "link";
+}
+
+function niceName(src, kind) {
+  if (/^https?:\/\//i.test(src) || /^www\./i.test(src)) {
+    if (/youtube\.com|youtu\.be/i.test(src)) return "YouTube video";
+    if (/vimeo\.com/i.test(src)) return "Vimeo video";
+    if (/drive\.google\.com/i.test(src)) return KIND_TEXT[kind] + " from Google Drive";
+    try { return new URL(/^www\./i.test(src) ? "https://" + src : src).hostname.replace(/^www\./, ""); } catch (e) { return src; }
+  }
+  const base = src.split("/").pop().replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim();
+  return base ? base.charAt(0).toUpperCase() + base.slice(1) : src;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderText(t) {
+  if (!t) return "";
+  return t.split(/\n{2,}/).map((para) => {
+    let h = esc(para.trim());
+    h = h.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+         .replace(/(^|[^*\w])\*(?!\s)(.+?)\*(?!\w)/g, "$1<em>$2</em>")
+         .replace(/\n/g, "<br>");
+    return h ? "<p>" + h + "</p>" : "";
+  }).join("");
+}
+
+/* Like renderText, but keeps links clickable (intro and credits). */
+function renderRich(t) {
+  return renderText(t).replace(
+    /\[([^\]<]+)\]\((https?:\/\/[^)\s<]+)\)|(https?:\/\/[^\s<]+[^\s<.,;:!?)])/g,
+    (all, label, url, bare) => {
+      const href = url || bare;
+      return '<a href="' + href + '" target="_blank" rel="noopener">' + (label || bare) + "</a>";
+    });
+}
+
+function showCard(info) {
+  $("cNum").textContent = info.number;
+  $("cTitle").textContent = info.title;
+  $("cBody").innerHTML = renderText(info.text);
+  const ul = $("cMedia");
+  ul.innerHTML = "";
+  info.items.forEach((item) => {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "media-btn";
+    btn.dataset.key = mediaInfo(item.src).key;
+    btn.dataset.kind = item.kind;
+    btn.innerHTML = '<span class="media-ico">' + ICONS[item.kind] + "</span>" +
+      '<span class="media-text"><span class="media-label">' + esc(item.label) + "</span>" +
+      '<span class="media-kind">' + actionText(item.kind, btn.dataset.key) + "</span></span>";
+    btn.addEventListener("click", () => openItem(item));
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+  $("card").hidden = false;
+  syncAudioButtons();
+  updatePoints();
+}
+
+function actionText(kind, key) {
+  if (kind === "audio") return (state.audioKey === key && !narr.paused) ? "Playing, tap to pause" : "Play sound";
+  if (kind === "video") return "Watch video";
+  if (kind === "image") return "View image";
+  return "Opens in a new tab";
+}
+
+$("cClose").addEventListener("click", () => {
+  $("card").hidden = true;
+  state.current = -1;
+  updatePoints();
+  if (state.api) { try { state.api.unselectAnnotation(function () {}); } catch (e) {} }
+});
+
+/* ================================================================== */
+/* Media sources                                                       */
+/* ================================================================== */
+function mediaInfo(src) {
+  let s = cleanSrc(src);
+  if (/^www\./i.test(s)) s = "https://" + s;
+  const isUrl = /^https?:\/\//i.test(s);
+  const out = { isUrl: isUrl, url: isUrl ? s : encodeURI(s), embed: null, driveId: null, file: isUrl ? null : s };
+  let m;
+  if (isUrl) {
+    if ((m = s.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/i))) {
+      out.embed = "https://www.youtube.com/embed/" + m[1] + "?autoplay=1&rel=0";
+    } else if ((m = s.match(/vimeo\.com\/(?:video\/)?(\d+)/i))) {
+      out.embed = "https://player.vimeo.com/video/" + m[1] + "?autoplay=1";
+    } else if ((m = s.match(/drive\.google\.com\/(?:file\/d\/|open\?(?:.*&)?id=|uc\?(?:.*&)?id=)([\w-]{20,})/i))) {
+      out.driveId = m[1];
+      out.embed = "https://drive.google.com/file/d/" + m[1] + "/preview";
+    } else if (/dropbox\.com/i.test(s)) {
+      out.url = s.replace(/([?&])dl=0/, "$1raw=1");
+      if (!/[?&]raw=1/.test(out.url)) out.url += (out.url.indexOf("?") > -1 ? "&" : "?") + "raw=1";
+    }
+  }
+  out.key = out.url;
+  return out;
+}
+
+function openItem(item) {
+  const info = mediaInfo(item.src);
+  if (item.kind === "link") { window.open(info.url, "_blank", "noopener"); return; }
+  if (item.kind === "audio" && !info.embed) { toggleNarration(item, info); return; }
+  openModal(item, info);
+}
+
+/* ================================================================== */
+/* Background music                                                    */
+/* ================================================================== */
+const music = { el: new Audio(), found: false, src: "", on: true, volume: clamp(MUSIC_VOLUME, 0, 100), fade: null };
+music.el.loop = true;
+music.el.preload = "auto";
+const VOLUME_WORKS = (() => { const a = new Audio(); a.volume = 0.5; return a.volume === 0.5; })(); // iPhone/iPad ignore volume
+
+function clamp(v, lo, hi) { v = Number(v); return isNaN(v) ? lo : Math.min(hi, Math.max(lo, v)); }
+
+function detectMusic() {
+  const names = MUSIC_FILE ? [MUSIC_FILE] : ["background.mp3", "background.m4a", "background.ogg", "background.wav", "background.aac"];
+  let i = 0;
+  const tryNext = () => {
+    if (i >= names.length) return;
+    const name = names[i++];
+    const probe = new Audio();
+    probe.preload = "metadata";
+    let settled = false;
+    const done = (ok) => {
+      if (settled) return; settled = true;
+      clearTimeout(timer);
+      if (!ok) return tryNext();
+      music.found = true;
+      music.src = name;
+      music.el.src = mediaInfo(name).url;
+      $("mVol").value = music.volume;
+      $("mVol").hidden = !VOLUME_WORKS;
+      renderMusic();
+      renderIntroMeta();
+      if (state.begun) startMusic();
+    };
+    const timer = setTimeout(() => done(false), 5000);
+    probe.addEventListener("loadedmetadata", () => done(true));
+    probe.addEventListener("error", () => done(false));
+    probe.src = mediaInfo(name).url;
+  };
+  tryNext();
+}
+
+function startMusic() {
+  if (!music.found) return;
+  $("music").hidden = false;
+  if (!music.on) return;
+  music.el.volume = VOLUME_WORKS ? 0 : 1;
+  const p = music.el.play();
+  if (p && p.catch) p.catch(() => { music.on = false; renderMusic(); });
+  applyMusicVolume();
+}
+
+function musicTarget() {
+  const v = music.volume / 100;
+  return (state.duckAudio || state.duckModal) ? v * clamp(MUSIC_DUCK, 0, 100) / 100 : v;
+}
+
+function applyMusicVolume() {
+  if (!music.found || !music.on || !state.begun) return;
+  if (!VOLUME_WORKS) {                                   // no volume control: pause instead of lowering
+    if (state.duckAudio || state.duckModal) music.el.pause(); else music.el.play().catch(() => {});
+    return;
+  }
+  clearInterval(music.fade);
+  const target = musicTarget();
+  music.fade = setInterval(() => {
+    const d = target - music.el.volume;
+    if (Math.abs(d) < 0.01) { music.el.volume = target; clearInterval(music.fade); return; }
+    music.el.volume = clamp(music.el.volume + d * 0.25, 0, 1);
+  }, 40);
+}
+
+function setMusicOn(on) {
+  music.on = on;
+  if (on) { startMusic(); } else { clearInterval(music.fade); music.el.pause(); }
+  renderMusic();
+}
+
+function renderMusic() {
+  $("mBtn").innerHTML = music.on ? ICONS.noteOn : ICONS.noteOff;
+  $("mBtn").setAttribute("aria-pressed", music.on ? "true" : "false");
+  $("mBtn").setAttribute("aria-label", music.on ? "Background music on. Press to turn off" : "Background music off. Press to turn on");
+}
+
+$("mBtn").addEventListener("click", () => setMusicOn(!music.on));
+$("mVol").addEventListener("input", () => {
+  music.volume = clamp($("mVol").value, 0, 100);
+  if (!music.on && music.volume > 0) setMusicOn(true);
+  applyMusicVolume();
+});
+
+function duck(which, on) { state[which] = on; applyMusicVolume(); }
+
+/* ================================================================== */
+/* Narration player                                                    */
+/* ================================================================== */
+const narr = new Audio();
+narr.preload = "auto";
+
+function toggleNarration(item, info) {
+  if (state.audioKey === info.key) { if (narr.paused) playNarration(); else narr.pause(); return; }
+  stopAudio();
+  state.audioKey = info.key;
+  state.audioFile = info.file;
+  $("pName").textContent = item.label;
+  $("pMsg").hidden = true;
+  $("pRow").hidden = false;
+  $("pSeek").value = 0;
+  $("pTime").textContent = "0:00";
+  $("player").hidden = false;
+  narr.src = info.url;
+  playNarration();
+}
+
+function playNarration() {
+  const p = narr.play();
+  if (p && p.catch) p.catch((err) => { if (err && err.name === "NotAllowedError") playerMessage("Tap the play button to start the sound."); });
+}
+
+function stopAudio() {
+  if (!state.audioKey) return;
+  state.audioKey = null;
+  narr.pause();
+  narr.removeAttribute("src");
+  narr.load();
+  $("player").hidden = true;
+  duck("duckAudio", false);
+  syncAudioButtons();
+}
+
+function playerMessage(html) { $("pMsg").innerHTML = html; $("pMsg").hidden = false; }
+
+function fmt(t) {
+  if (!isFinite(t) || t < 0) t = 0;
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return m + ":" + (s < 10 ? "0" : "") + s;
+}
+
+let seeking = false;
+function syncNarrationUI() {
+  const playing = !!state.audioKey && !narr.paused;
+  $("pPlay").innerHTML = playing ? ICONS.pause : ICONS.play;
+  $("pPlay").setAttribute("aria-label", playing ? "Pause" : "Play");
+  if (!seeking && narr.duration) $("pSeek").value = Math.round(narr.currentTime / narr.duration * 1000);
+  $("pTime").textContent = fmt(narr.currentTime) + (narr.duration ? " / " + fmt(narr.duration) : "");
+  syncAudioButtons();
+}
+
+function syncAudioButtons() {
+  document.querySelectorAll('.media-btn[data-kind="audio"]').forEach((b) => {
+    b.setAttribute("aria-pressed", (b.dataset.key === state.audioKey && !narr.paused) ? "true" : "false");
+    b.querySelector(".media-kind").textContent = actionText("audio", b.dataset.key);
+  });
+}
+
+["timeupdate", "loadedmetadata", "durationchange"].forEach((ev) => narr.addEventListener(ev, syncNarrationUI));
+narr.addEventListener("play", () => { duck("duckAudio", true); syncNarrationUI(); });
+narr.addEventListener("pause", () => { duck("duckAudio", false); syncNarrationUI(); });
+narr.addEventListener("ended", () => { narr.currentTime = 0; duck("duckAudio", false); syncNarrationUI(); });
+narr.addEventListener("error", () => {
+  if (!state.audioKey) return;
+  $("pRow").hidden = true;
+  duck("duckAudio", false);
+  playerMessage(state.audioFile
+    ? "Can't find <strong>" + esc(state.audioFile) + "</strong>. Put the file in the same folder as index.html and make sure the name matches exactly, including capital letters."
+    : "This sound link can't be played here. Use a direct link to an audio file, or a YouTube or Google Drive link.");
+  syncNarrationUI();
+});
+
+$("pPlay").addEventListener("click", () => { if (narr.paused) playNarration(); else narr.pause(); });
+$("pStop").addEventListener("click", stopAudio);
+$("pSeek").addEventListener("input", () => { seeking = true; if (narr.duration) narr.currentTime = $("pSeek").value / 1000 * narr.duration; });
+$("pSeek").addEventListener("change", () => { seeking = false; });
+
+/* ================================================================== */
+/* Popup for video, images and embedded players                        */
+/* ================================================================== */
+let lastFocus = null;
+
+function openModal(item, info) {
+  if (!narr.paused) narr.pause();
+  lastFocus = document.activeElement;
+  const stage = $("stage");
+  stage.innerHTML = "";
+  $("mTitle").textContent = item.label;
+  const plays = item.kind === "video" || item.kind === "audio";
+
+  const missing = () => {
+    stage.innerHTML = '<div class="m-error">' + (info.file
+      ? "Can't find <strong>" + esc(info.file) + "</strong>. Put the file in the same folder as index.html and make sure the name matches exactly, including capital letters and the file ending (.mp4, .jpg …)."
+      : "This link can't be shown here. Use a direct link to the file, or a YouTube, Vimeo or Google Drive link.") + "</div>";
+    duck("duckModal", false);
+  };
+
+  if (item.kind === "image" && info.driveId) {
+    const img = new Image();
+    img.alt = item.label;
+    img.onerror = () => { stage.innerHTML = ""; stage.appendChild(makeFrame(info.embed, item.label)); };
+    img.src = "https://drive.google.com/thumbnail?id=" + info.driveId + "&sz=w2400";
+    stage.appendChild(img);
+  } else if (info.embed) {
+    stage.appendChild(makeFrame(info.embed, item.label));
+  } else if (item.kind === "video") {
+    const v = document.createElement("video");
+    v.controls = true; v.autoplay = true; v.playsInline = true;
+    v.onerror = missing;
+    v.addEventListener("play", () => duck("duckModal", true));
+    v.addEventListener("pause", () => duck("duckModal", false));
+    v.addEventListener("ended", () => duck("duckModal", false));
+    v.src = info.url;
+    stage.appendChild(v);
+  } else {
+    const img = new Image();
+    img.alt = item.label;
+    img.onerror = missing;
+    img.src = info.url;
+    stage.appendChild(img);
+  }
+
+  if (plays && info.embed) duck("duckModal", true);   // embedded players: lower music while open
+  $("modal").hidden = false;
+  $("mClose").focus();
+}
+
+function makeFrame(src, title) {
+  const f = document.createElement("iframe");
+  f.src = src; f.title = title;
+  f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+  f.allowFullscreen = true;
+  return f;
+}
+
+function closeModal() {
+  if ($("modal").hidden) return;
+  const v = $("stage").querySelector("video");
+  if (v) { v.pause(); v.removeAttribute("src"); v.load(); }
+  $("stage").innerHTML = "";
+  $("modal").hidden = true;
+  duck("duckModal", false);
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+
+$("mClose").addEventListener("click", closeModal);
+$("modal").addEventListener("click", (e) => { if (e.target === $("modal")) closeModal(); });
+
+document.addEventListener("keydown", (e) => {
+  const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.type !== "range";
+  if (e.key === "Escape") {
+    if (!$("modal").hidden) closeModal();
+    else if (!$("sheetWrap").hidden) $("sheetWrap").hidden = true;
+    else if (!$("intro").hidden && state.begun) $("intro").hidden = true;
+    else if (!$("ptConfirm").hidden) $("ptNo").click();
+  } else if ((e.key === "m" || e.key === "M") && !typing && music.found && state.begun) {
+    setMusicOn(!music.on);
+  }
+});
+
+/* ================================================================== */
+/* File checker (for students)                                          */
+/* ================================================================== */
+function mediaExists(url, kind) {
+  return new Promise((resolve) => {
+    let el;
+    if (kind === "image") el = new Image();
+    else el = document.createElement(kind === "video" ? "video" : "audio");
+    const t = setTimeout(() => finish("unknown"), 6000);
+    function finish(r) { clearTimeout(t); el.onload = el.onerror = el.onloadedmetadata = null; resolve(r); }
+    if (kind === "image") { el.onload = () => finish("ok"); el.onerror = () => finish("bad"); }
+    else { el.preload = "metadata"; el.onloadedmetadata = () => finish("ok"); el.onerror = () => finish("bad"); }
+    el.src = url;
+  });
+}
+
+$("btnCheck").addEventListener("click", async () => {
+  $("intro").hidden = true;
+  showSheet("Check my annotations", "<p>Checking…</p>");
+  if (!state.list.length) { $("sBody").innerHTML = "<p>No annotations found on this model.</p>"; return; }
+
+  let html = "";
+  html += "<h3>Background music</h3><ul><li>" + (music.found
+    ? '<span class="ok">✓</span><span>' + esc(music.src) + " found</span>"
+    : '<span class="meh">–</span><span>None (optional). Add a file named background.mp3 to use music.</span>') + "</li></ul>";
+
+  const desc = splitDescription(state.info && state.info.description);
+  html += "<h3>Intro and credits (Sketchfab model description)</h3><ul>" +
+    "<li>" + (desc.intro ? '<span class="ok">✓</span><span>Intro text found</span>' : '<span class="meh">–</span><span>No intro text. Write one in your model description.</span>') + "</li>" +
+    "<li>" + (desc.credits ? '<span class="ok">✓</span><span>Credits found</span>' : '<span class="bad">!</span><span>No credits. Add a line starting with <strong>Credits:</strong> to your model description.</span>') + "</li></ul>";
+
+  for (let i = 0; i < state.list.length; i++) {
+    const info = parseAnnotation(state.list[i], i);
+    html += "<h3>" + info.number + ". " + esc(info.title) + "</h3><ul>";
+    if (!info.items.length) html += '<li><span class="meh">–</span><span>Text only</span></li>';
+    for (const item of info.items) {
+      const m = mediaInfo(item.src);
+      let mark, note;
+      if (m.isUrl || item.kind === "link") { mark = '<span class="meh">↗</span>'; note = m.isUrl ? "web link" : "file link"; }
+      else {
+        const r = await mediaExists(m.url, item.kind);
+        if (r === "ok") { mark = '<span class="ok">✓</span>'; note = "found"; }
+        else if (r === "bad") { mark = '<span class="bad">✗</span>'; note = "<strong>not found</strong>: check the file name and that it's in the folder"; }
+        else { mark = '<span class="meh">?</span>'; note = "couldn't check"; }
+      }
+      html += "<li>" + mark + "<span>" + KIND_TEXT[item.kind] + ": " + esc(item.src) + " (" + note + ")</span></li>";
+    }
+    info.unknown.forEach((w) => {
+      html += '<li><span class="bad">!</span><span>Unknown tag <strong>[' + esc(w) + ': …]</strong>. Use sound, video, image or link.</span></li>';
+    });
+    html += "</ul>";
+    $("sBody").innerHTML = html;
+  }
+});
+
+$("btnCopy").addEventListener("click", async () => {
+  const link = location.origin + location.pathname + "?model=" + state.modelId;
+  try { await navigator.clipboard.writeText(link); $("btnCopy").textContent = "Link copied"; }
+  catch (e) { window.prompt("Copy this link:", link); }
+  setTimeout(() => { $("btnCopy").textContent = "Copy share link"; }, 2000);
+});
+
+function notice(html) { $("noticeText").innerHTML = html; $("notice").hidden = false; }
+$("noticeClose").addEventListener("click", () => { $("notice").hidden = true; });
+
+renderMusic();
+boot();
+})();
+</script>
+</body>
+</html>
