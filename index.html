@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>3D Story</title>
+<meta name="g1-build" content="portrait-play-fix-20261126">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
@@ -252,6 +253,15 @@ button { cursor: pointer; }
 .study-play:hover { background:var(--accent); }
 .study-play svg { width:34px; height:34px; }
 #studyToast { position:fixed; z-index:125; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); text-align:center; left:50%; transform:translateX(-50%); width:min(500px,calc(100vw - 32px)); padding:14px 18px; border-radius:10px; background:var(--ink); color:white; font-size:15px; box-shadow:0 6px 22px #0005; pointer-events:none; }
+/* Explicit portrait framing and consistent overlay controls. */
+#studyVideos .study-video-frame.handshake { width:min(100%, 191px); aspect-ratio:9/16; }
+#studyVideos .study-video-frame.handshake video { width:100%; height:100%; max-height:none; aspect-ratio:9/16; object-fit:cover; }
+#studyVideos .study-video-frame.handshake.native-portrait video { object-fit:contain; }
+#studyVideos .study-video-frame iframe { width:100%; height:auto; aspect-ratio:16/9; max-height:340px; }
+#studyVideos .study-video-frame.handshake iframe { height:100%; aspect-ratio:9/16; max-height:none; }
+#studyVideos .study-play { z-index:3; width:80px; height:80px; }
+#studyVideos .study-play svg { width:38px; height:38px; }
+#studyVideos .study-video-frame:not(.handshake) video { aspect-ratio:auto; min-height:110px; }
 </style>
 </head>
 
@@ -951,7 +961,18 @@ function renderStudyVideos(cardInfo) {
       if (img.complete && img.naturalWidth) requestAnimationFrame(done);
     } else if (info.embed) {
       const frame = makeFrame(info.embed.replace(/([?&])autoplay=1/g, "$1autoplay=0"), item.label);
-      box.append(frame);
+      if (item.kind === "video") {
+        const wrapper = document.createElement("div"); wrapper.className = "study-video-frame";
+        if (/hand[\s_-]*shake/i.test(item.label + " " + item.src + " " + cardInfo.title)) wrapper.classList.add("handshake");
+        const play = document.createElement("button"); play.type = "button"; play.className = "study-play";
+        play.setAttribute("aria-label", "Play " + item.label); play.innerHTML = ICONS.play;
+        play.addEventListener("click", () => {
+          if (/youtube\.com|player\.vimeo\.com/i.test(info.embed)) frame.src = info.embed;
+          play.hidden = true;
+          frame.focus();
+        });
+        wrapper.append(frame, play); box.append(wrapper);
+      } else { box.append(frame); }
       const confirm = document.createElement("button");
       confirm.type = "button"; confirm.className = "chip"; confirm.textContent = "Mark as viewed";
       confirm.addEventListener("click", done); box.append(confirm);
@@ -970,13 +991,21 @@ function renderStudyVideos(cardInfo) {
         const frame = document.createElement("div"); frame.className = "study-video-frame";
         const play = document.createElement("button"); play.type = "button"; play.className = "study-play";
         play.setAttribute("aria-label", "Play " + item.label); play.innerHTML = ICONS.play;
+        const handshake = /hand[\s_-]*shake/i.test(item.label + " " + item.src + " " + cardInfo.title);
+        if (handshake) frame.classList.add("handshake");
         const fit = () => {
           if (!v.videoWidth || !v.videoHeight) return;
           const ratio = v.videoWidth / v.videoHeight;
           frame.classList.toggle("portrait", ratio < 1);
           frame.style.setProperty("--portrait-width", Math.round(340 * ratio) + "px");
+          if (handshake) {
+            frame.classList.toggle("native-portrait", ratio < 1);
+            if (ratio < 1) {
+              frame.style.aspectRatio = v.videoWidth + "/" + v.videoHeight;
+              frame.style.width = "min(100%, " + Math.round(340 * ratio) + "px)";
+            }
+          }
         };
-        if (/hand[\s_-]*shake/i.test(item.label + " " + item.src)) frame.classList.add("portrait");
         v.addEventListener("loadedmetadata", fit);
         const syncPlay = () => { play.hidden = !v.paused && !v.ended; };
         play.addEventListener("click", () => { v.play().catch(() => { play.hidden = false; }); });
