@@ -214,15 +214,36 @@ button { cursor: pointer; }
   .card, #player { animation: rise .18s ease-out; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
-/* Study video panel: beside story text on wide screens, stacked on narrow screens. */
-#studyVideos { position: fixed; top: calc(72px + env(safe-area-inset-top, 0px)); right: 392px; width: min(420px, calc(100vw - 715px)); z-index: 12; padding: 12px; background: var(--paper); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-height: calc(100vh - 150px); overflow: auto; }
-#studyVideos video { display: block; width: 100%; max-height: 38vh; background: #000; border-radius: 8px; }
-.study-video { margin-bottom: 12px; }
+/* Compact video card beside the story text. */
+#stack:has(#studyVideos:not([hidden])) { width: min(580px, calc(100vw - 32px)); display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); align-items: start; }
+#stack:has(#studyVideos:not([hidden])) #card { grid-column: 2; grid-row: 1; }
+#stack:has(#studyVideos:not([hidden])) #studyVideos { grid-column: 1; grid-row: 1; }
+#stack:has(#studyVideos:not([hidden])) #player { grid-column: 2; }
+#studyVideos { min-width: 0; padding: 8px; background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-height: calc(100vh - 180px); overflow: auto; }
+#studyVideos video, #studyVideos iframe { display: block; width: 100%; aspect-ratio: 16/9; max-height: 160px; background: #000; border: 0; border-radius: 6px; object-fit: contain; }
+.study-video { margin-bottom: 10px; }
 .study-video:last-child { margin-bottom: 0; }
-.study-video-title { font-weight: 700; margin: 0 0 5px; }
-.study-video-status { font-size: 13px; margin: 5px 0 0; color: var(--muted); }
+.study-video-title { font-weight: 700; font-size: 14px; margin: 0 0 5px; }
+.study-video-status { font-size: 12px; margin: 5px 0 0; color: var(--muted); }
 .study-video-status.done { color: #1c6b36; font-weight: 700; }
-@media (max-width: 1100px) { #studyVideos { position: static; width: auto; max-height: 35vh; } }
+@media (min-width: 641px) and (max-width: 950px) {
+  #stack:has(#studyVideos:not([hidden])) { top: 130px; width: min(560px, calc(100vw - 32px)); }
+  #points { width: min(220px, calc(100vw - 32px)); }
+  #ptList { max-height: 100px; }
+  #stack:has(#studyVideos:not([hidden])) .card, #studyVideos { max-height: calc(100vh - 210px); }
+}
+@media (max-width: 640px) {
+  #stack:has(#studyVideos:not([hidden])) { width: auto; grid-template-columns: minmax(0, 40%) minmax(0, 1fr); gap: 6px; }
+  #studyVideos { max-height: 40vh; }
+  #stack:has(#studyVideos:not([hidden])) .card { max-height: 40vh; }
+}
+@media (max-width: 420px) {
+  #stack:has(#studyVideos:not([hidden])) { grid-template-columns: 1fr; }
+  #stack:has(#studyVideos:not([hidden])) #card { grid-column: 1; grid-row: 1; max-height: 25vh; }
+  #stack:has(#studyVideos:not([hidden])) #studyVideos { grid-column: 1; grid-row: 2; max-height: 27vh; }
+  #stack:has(#studyVideos:not([hidden])) #player { grid-column: 1; }
+  #studyVideos video, #studyVideos iframe { max-height: 110px; }
+}
 </style>
 </head>
 
@@ -345,7 +366,7 @@ button { cursor: pointer; }
     <ul class="how">
       <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Click the <strong>numbered points</strong> on the model to open each part of the story.</span></li>
       <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span><strong>Drag</strong> to turn the model, <strong>scroll or pinch</strong> to zoom.</span></li>
-      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span><strong>Story points</strong> (top left) ticks off each point after you open it and finish its required videos.</span></li>
+      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span><strong>Story points</strong> (top left) ticks off each point after you open it and watch most of its videos.</span></li>
     </ul>
     <div class="intro-foot">
       <div id="iMeta" aria-live="polite"></div>
@@ -690,25 +711,31 @@ function reportProgress() {
 window.addEventListener("message", e => {
   if (e.source === window.parent && e.data && e.data.type === "g1-study-request-progress") reportProgress();
 });
+// Count distinct played portions across revisits; allow normal seeking and pausing.
+const videoCoverage = new Map();
+const VIDEO_COMPLETION = 0.75;
 function trackVideo(v, point, key) {
-  v.addEventListener("ended", () => {
-    if (!Number.isFinite(v.duration) || v.duration <= 0) return;
-    let covered = 0;
-    for (let j = 0; j < v.played.length; j++) covered += v.played.end(j) - v.played.start(j);
-    // Allow only small browser timing discrepancies, not skipped sections.
-    if (covered < v.duration - Math.min(0.25, v.duration * 0.01)) {
-      notice("Please play the entire video without skipping any sections, then finish it again.");
-      return;
+  const id = videoKey(point, key);
+  function update() {
+    if (watchedVideos.has(id) || !Number.isFinite(v.duration) || v.duration <= 0) return;
+    const ranges = (videoCoverage.get(id) || []).slice();
+    for (let j = 0; j < v.played.length; j++) ranges.push([v.played.start(j), v.played.end(j)]);
+    ranges.sort((a,b) => a[0]-b[0]);
+    const merged = [];
+    for (const r of ranges) {
+      const last = merged[merged.length-1];
+      if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+      else merged.push(r.slice());
     }
-    watchedVideos.add(videoKey(point, key));
-    checkPoint(point);
-    if (state.current === point) {
-      refreshStudyVideoStatus();
-      document.querySelectorAll('.media-btn[data-kind="video"]').forEach(b => {
-        b.querySelector(".media-kind").textContent = actionText("video", b.dataset.key);
-      });
+    videoCoverage.set(id, merged);
+    const covered = merged.reduce((n,r) => n+r[1]-r[0],0);
+    if (covered >= v.duration * VIDEO_COMPLETION) {
+      watchedVideos.add(id);
+      checkPoint(point);
+      if (state.current === point) refreshStudyVideoStatus();
     }
-  });
+  }
+  ['timeupdate','pause','ended','seeked'].forEach(event => v.addEventListener(event, update));
 }
 
 function goTo(i) {
@@ -732,6 +759,7 @@ $("ptYes").addEventListener("click", () => {
   state.current = -1;
   requiredVideos.clear();
   watchedVideos.clear();
+  videoCoverage.clear();
   updatePoints();
   if (state.list.length) goTo(0);
 });
@@ -860,7 +888,7 @@ function clearStudyVideos() {
 function refreshStudyVideoStatus() {
   $("studyVideos").querySelectorAll(".study-video-status").forEach(label => {
     const done = watchedVideos.has(label.dataset.key);
-    label.textContent = done ? "✓ Video completed" : "Required — play the full video";
+    label.textContent = done ? "✓ Video completed" : "Please watch most of this video";
     label.classList.toggle("done", done);
   });
 }
@@ -881,7 +909,12 @@ function renderStudyVideos(cardInfo) {
     const status = document.createElement("p"); status.className = "study-video-status"; status.dataset.key = videoKey(point, info.key);
     box.append(title);
     if (info.embed) {
-      const error = document.createElement("p"); error.textContent = "This video requires a direct MP4 or WebM file. Please contact the researcher."; box.append(error);
+      const frame = makeFrame(info.embed.replace(/([?&])autoplay=1/g, "$1autoplay=0"), item.label);
+      box.append(frame);
+      const confirm = document.createElement("button");
+      confirm.type = "button"; confirm.className = "chip"; confirm.textContent = "I have watched this video";
+      confirm.addEventListener("click", () => { watchedVideos.add(videoKey(point, info.key)); checkPoint(point); refreshStudyVideoStatus(); });
+      box.append(confirm);
     } else {
       const v = document.createElement("video");
       v.controls = true; v.autoplay = false; v.playsInline = true; v.preload = "metadata";
@@ -907,6 +940,7 @@ function showCard(info) {
   const ul = $("cMedia");
   ul.innerHTML = "";
   renderStudyVideos(info);
+  if (info.items.some(it => it.kind === "video") && window.innerWidth > 640 && window.innerWidth <= 950) setCollapsed(true);
   info.items.filter(item => item.kind !== "video").forEach((item) => {
     const li = document.createElement("li");
     const btn = document.createElement("button");
@@ -928,7 +962,7 @@ function showCard(info) {
 
 function actionText(kind, key) {
   if (kind === "audio") return (state.audioKey === key && !narr.paused) ? "Playing, tap to pause" : "Play sound";
-  if (kind === "video") return watchedVideos.has(videoKey(state.current, key)) ? "Completed — watch again" : "Watch full video (required)";
+  if (kind === "video") return watchedVideos.has(videoKey(state.current, key)) ? "Completed — watch again" : "Watch video";
   if (kind === "image") return "View image";
   return "Opens in a new tab";
 }
