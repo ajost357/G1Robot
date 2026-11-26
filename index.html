@@ -713,7 +713,7 @@ window.addEventListener("message", e => {
 });
 // Count distinct played portions across revisits; allow normal seeking and pausing.
 const videoCoverage = new Map();
-const VIDEO_COMPLETION = 0.10;
+const VIDEO_COMPLETION = 0.18;
 function trackVideo(v, point, key) {
   const id = videoKey(point, key);
   function update() {
