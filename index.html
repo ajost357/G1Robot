@@ -552,6 +552,7 @@ function loadModel(id) {
       state.api = api;
       api.addEventListener("viewerready", onViewerReady);
       api.addEventListener("annotationSelect", onAnnotationSelect);
+      api.addEventListener("annotationFocus", onAnnotationFocus);
       api.start();
     },
     error: function () {
@@ -564,6 +565,35 @@ function loadModel(id) {
       notice("<strong>The model is taking a long time to load.</strong> Check your internet connection. If it still doesn't load, open this page in Chrome or Edge.");
     }
   }, 12000);
+}
+
+// Camera distance multipliers: preserve the saved viewing angle and target.
+const INITIAL_CAMERA_DISTANCE = 1.20;
+const POINT_CAMERA_DISTANCE = 1.12;
+let cameraRequest = 0;
+let pendingCameraPoint = -1;
+function zoomCameraOut(factor, point) {
+  const api = state.api;
+  const request = ++cameraRequest;
+  if (!api) return;
+  api.getCameraLookAt(function (err, camera) {
+    if (err || !camera || request !== cameraRequest || state.current !== point) return;
+    const { position, target } = camera;
+    if (!Array.isArray(position) || !Array.isArray(target) || position.length !== 3 || target.length !== 3) return;
+    const eye = position.map((value, i) => target[i] + (value - target[i]) * factor);
+    if (!eye.every(Number.isFinite)) return;
+    api.setCameraLookAt(eye, target, 0.35, function () {});
+  });
+}
+function onAnnotationFocus(index) {
+  if (!state.begun || index !== state.current || index !== pendingCameraPoint) return;
+  pendingCameraPoint = -1;
+  zoomCameraOut(POINT_CAMERA_DISTANCE, index);
+}
+function resetStoryScroll() {
+  $("stack").scrollTop = 0;
+  $("card").scrollTop = 0;
+  $("studyVideos").scrollTop = 0;
 }
 
 function onViewerReady() {
@@ -647,6 +677,7 @@ $("iBegin").addEventListener("click", () => {
   $("intro").hidden = true;
   if (!state.begun) {
     state.begun = true;
+    if (state.current === -1) zoomCameraOut(INITIAL_CAMERA_DISTANCE, -1);
     $("points").hidden = false;
     setCollapsed(!!(window.matchMedia && window.matchMedia("(max-width: 640px)").matches));
   }
@@ -794,6 +825,7 @@ $("ptYes").addEventListener("click", () => {
   stopAudio(); closeModal(); clearStudyVideos();
   state.visited.clear();
   state.current = -1;
+  ++cameraRequest; pendingCameraPoint = -1;
   requiredVideos.clear();
   watchedVideos.clear();
   videoCoverage.clear();
@@ -820,7 +852,14 @@ function remindIfUnfinished() {
 }
 function onAnnotationSelect(index) {
   if (!state.begun || typeof index !== "number" || index < 0 || index >= state.list.length || !state.api) return;
-  if (index !== state.current) { remindIfUnfinished(); stopAudio(); clearStudyVideos(); }
+  const changed = index !== state.current;
+  if (!changed && !$("card").hidden && $("cNum").textContent === String(index + 1)) return;
+  if (changed) {
+    ++cameraRequest;
+    pendingCameraPoint = index;
+    remindIfUnfinished(); stopAudio(); clearStudyVideos();
+    resetStoryScroll();
+  }
   state.current = index;
   updatePoints();
 
@@ -830,6 +869,7 @@ function onAnnotationSelect(index) {
     const cardInfo = parseAnnotation(a, index);
     requiredVideos.set(index, cardInfo.items.map(it => it.kind + "|" + mediaInfo(it.src).key));
     showCard(cardInfo);
+    if (changed) resetStoryScroll();
     checkPoint(index);
   });
 }
@@ -1062,6 +1102,7 @@ $("cClose").addEventListener("click", () => {
   $("card").hidden = true;
   clearStudyVideos();
   state.current = -1;
+  ++cameraRequest; pendingCameraPoint = -1;
   updatePoints();
   if (state.api) { try { state.api.unselectAnnotation(function () {}); } catch (e) {} }
 });
