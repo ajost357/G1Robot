@@ -243,6 +243,15 @@ button { cursor: pointer; }
 @media (max-width:640px) {
   #stack:has(#studyVideos:not([hidden])) { width: auto; max-height: 55vh; gap: 8px; }
 }
+/* Native aspect ratio and accessible central play control. */
+#studyVideos .study-video-frame { position:relative; width:100%; margin-inline:auto; border-radius:6px; overflow:hidden; background:#000; }
+#studyVideos .study-video-frame video { width:100%; height:auto; aspect-ratio:auto; max-height:340px; object-fit:contain; }
+#studyVideos .study-video-frame.portrait { width:min(100%, var(--portrait-width, 192px)); }
+#studyVideos .study-video-frame.portrait video { aspect-ratio:auto; }
+.study-play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:72px; height:72px; display:grid; place-items:center; border:2px solid white; border-radius:50%; background:rgba(14,18,22,.82); color:white; box-shadow:0 3px 16px #0008; }
+.study-play:hover { background:var(--accent); }
+.study-play svg { width:34px; height:34px; }
+#studyToast { position:fixed; z-index:125; bottom:calc(24px + env(safe-area-inset-bottom, 0px)); text-align:center; left:50%; transform:translateX(-50%); width:min(500px,calc(100vw - 32px)); padding:14px 18px; border-radius:10px; background:var(--ink); color:white; font-size:15px; box-shadow:0 6px 22px #0005; pointer-events:none; }
 </style>
 </head>
 
@@ -372,6 +381,7 @@ button { cursor: pointer; }
       <button class="primary" id="iBegin" disabled>Loading model…</button>
     </div>
     <div id="iExtra" hidden>
+      <p>To continue the study, please explore every story point and interact with its accompanying media. Completed items are marked with a checkmark.</p>
       <div class="row"><span>Keyboard: <strong>Esc</strong> closes pop-ups · <strong>M</strong> music on/off</span></div>
       <div class="row">
         <button class="linkish" id="btnCheck">Check my annotations</button>
@@ -385,6 +395,7 @@ button { cursor: pointer; }
   </p>
 </section>
 
+<div id="studyToast" hidden role="status" aria-live="polite"></div>
 <div id="notice" hidden role="alert">
   <div id="noticeText"></div>
   <button class="icon-btn" id="noticeClose" aria-label="Dismiss"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -769,9 +780,20 @@ $("ptHelp").addEventListener("click", () => openIntro("help"));
 /* ================================================================== */
 /* Annotation → card                                                   */
 /* ================================================================== */
+let studyReminderShown = false;
+function remindIfUnfinished() {
+  const point = state.current;
+  const required = requiredVideos.get(point);
+  if (studyReminderShown || !required || !required.some(key => !watchedVideos.has(videoKey(point,key)))) return;
+  studyReminderShown = true;
+  const toast = $("studyToast");
+  toast.textContent = "Please explore all story points and their accompanying media before continuing the study.";
+  toast.hidden = false;
+  setTimeout(() => { toast.hidden = true; }, 6500);
+}
 function onAnnotationSelect(index) {
   if (!state.begun || typeof index !== "number" || index < 0 || index >= state.list.length || !state.api) return;
-  if (index !== state.current) { stopAudio(); clearStudyVideos(); }
+  if (index !== state.current) { remindIfUnfinished(); stopAudio(); clearStudyVideos(); }
   state.current = index;
   updatePoints();
 
@@ -944,7 +966,24 @@ function renderStudyVideos(cardInfo) {
       v.addEventListener("pause", syncDuck); v.addEventListener("ended", syncDuck);
       v.addEventListener("error", () => { syncDuck(); fail(); });
       trackVideo(v, point, key);
-      v.src = info.url; box.append(v);
+      if (item.kind === "video") {
+        const frame = document.createElement("div"); frame.className = "study-video-frame";
+        const play = document.createElement("button"); play.type = "button"; play.className = "study-play";
+        play.setAttribute("aria-label", "Play " + item.label); play.innerHTML = ICONS.play;
+        const fit = () => {
+          if (!v.videoWidth || !v.videoHeight) return;
+          const ratio = v.videoWidth / v.videoHeight;
+          frame.classList.toggle("portrait", ratio < 1);
+          frame.style.setProperty("--portrait-width", Math.round(340 * ratio) + "px");
+        };
+        if (/hand[\s_-]*shake/i.test(item.label + " " + item.src)) frame.classList.add("portrait");
+        v.addEventListener("loadedmetadata", fit);
+        const syncPlay = () => { play.hidden = !v.paused && !v.ended; };
+        play.addEventListener("click", () => { v.play().catch(() => { play.hidden = false; }); });
+        v.addEventListener("play", syncPlay); v.addEventListener("pause", syncPlay); v.addEventListener("ended", syncPlay);
+        frame.append(v, play); box.append(frame);
+      } else { box.append(v); }
+      v.src = info.url;
     }
     box.append(status); panel.append(box);
   });
@@ -972,6 +1011,7 @@ function actionText(kind, key) {
 }
 
 $("cClose").addEventListener("click", () => {
+  remindIfUnfinished();
   $("card").hidden = true;
   clearStudyVideos();
   state.current = -1;
