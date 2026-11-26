@@ -195,7 +195,7 @@ button { cursor: pointer; }
 
 #notice {
   position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
-  z-index: 120; width: min(560px, calc(100vw - 32px)); background: #fff4dc; color: #3d2c00; border-radius: 12px;
+  z-index: 120; width: min(760px, calc(100vw - 32px)); background: #fff4dc; color: #3d2c00; border-radius: 12px;
   padding: 14px 44px 14px 16px; line-height: 1.45; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
 }
 #notice .icon-btn { position: absolute; top: 8px; right: 8px; color: #3d2c00; }
@@ -215,25 +215,25 @@ button { cursor: pointer; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
 /* Compact video card beside the story text. */
-#stack:has(#studyVideos:not([hidden])) { width: min(580px, calc(100vw - 32px)); display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); align-items: start; }
+#stack:has(#studyVideos:not([hidden])) { width: min(850px, calc(100vw - 32px)); display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
 #stack:has(#studyVideos:not([hidden])) #card { grid-column: 2; grid-row: 1; }
 #stack:has(#studyVideos:not([hidden])) #studyVideos { grid-column: 1; grid-row: 1; }
 #stack:has(#studyVideos:not([hidden])) #player { grid-column: 2; }
 #studyVideos { min-width: 0; padding: 8px; background: var(--paper); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-height: calc(100vh - 180px); overflow: auto; }
-#studyVideos video, #studyVideos iframe { display: block; width: 100%; aspect-ratio: 16/9; max-height: 160px; background: #000; border: 0; border-radius: 6px; object-fit: contain; }
+#studyVideos video, #studyVideos iframe { display: block; width: 100%; aspect-ratio: 16/9; max-height: 340px; background: #000; border: 0; border-radius: 6px; object-fit: contain; }
 .study-video { margin-bottom: 10px; }
 .study-video:last-child { margin-bottom: 0; }
 .study-video-title { font-weight: 700; font-size: 14px; margin: 0 0 5px; }
 .study-video-status { font-size: 12px; margin: 5px 0 0; color: var(--muted); }
 .study-video-status.done { color: #1c6b36; font-weight: 700; }
 @media (min-width: 641px) and (max-width: 950px) {
-  #stack:has(#studyVideos:not([hidden])) { top: 130px; width: min(560px, calc(100vw - 32px)); }
+  #stack:has(#studyVideos:not([hidden])) { top: 130px; width: min(760px, calc(100vw - 32px)); }
   #points { width: min(220px, calc(100vw - 32px)); }
   #ptList { max-height: 100px; }
   #stack:has(#studyVideos:not([hidden])) .card, #studyVideos { max-height: calc(100vh - 210px); }
 }
 @media (max-width: 640px) {
-  #stack:has(#studyVideos:not([hidden])) { width: auto; grid-template-columns: minmax(0, 40%) minmax(0, 1fr); gap: 6px; }
+  #stack:has(#studyVideos:not([hidden])) { width: auto; grid-template-columns: minmax(0, 55%) minmax(0, 1fr); gap: 6px; }
   #studyVideos { max-height: 40vh; }
   #stack:has(#studyVideos:not([hidden])) .card { max-height: 40vh; }
 }
@@ -242,8 +242,13 @@ button { cursor: pointer; }
   #stack:has(#studyVideos:not([hidden])) #card { grid-column: 1; grid-row: 1; max-height: 25vh; }
   #stack:has(#studyVideos:not([hidden])) #studyVideos { grid-column: 1; grid-row: 2; max-height: 27vh; }
   #stack:has(#studyVideos:not([hidden])) #player { grid-column: 1; }
-  #studyVideos video, #studyVideos iframe { max-height: 110px; }
+  #studyVideos video, #studyVideos iframe { max-height: 180px; }
 }
+#studyVideos img { display:block; width:100%; max-height:340px; object-fit:contain; border-radius:6px; }
+#studyVideos audio { display:block; width:100%; }
+.study-link-preview { background:#f4f7f8; padding:14px; border-radius:8px; font-size:14px; line-height:1.5; overflow-wrap:anywhere; }
+.study-link-preview a { color:var(--accent); font-weight:700; }
+@media (min-width:951px) { #stack:has(#studyVideos:not([hidden])) { width:min(850px, calc(100vw - 330px)); } }
 </style>
 </head>
 
@@ -262,7 +267,7 @@ button { cursor: pointer; }
   <div id="ptBody">
     <div class="pt-bar"><div id="ptFill"></div></div>
     <ol id="ptList"></ol>
-    <p id="ptDone" hidden>All points and required videos completed. You may continue to the survey. <button class="linkish" id="ptDoneCredits">View credits</button></p>
+    <p id="ptDone" hidden>All story points completed. You may continue to the survey. <button class="linkish" id="ptDoneCredits">View credits</button></p>
     <div class="pt-foot" id="ptFoot">
       <button class="chip" id="ptReset" title="Clear checkmarks and go back to point 1">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
@@ -292,7 +297,7 @@ button { cursor: pointer; }
     <div class="card-body" id="cBody"></div>
     <ul class="media" id="cMedia"></ul>
   </article>
-  <section id="studyVideos" hidden aria-label="Required videos"></section>
+  <section id="studyVideos" hidden aria-label="Story media"></section>
   <div id="player" hidden>
     <button class="round" id="pPlay" aria-label="Pause"></button>
     <div class="p-main">
@@ -366,7 +371,7 @@ button { cursor: pointer; }
     <ul class="how">
       <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Click the <strong>numbered points</strong> on the model to open each part of the story.</span></li>
       <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span><strong>Drag</strong> to turn the model, <strong>scroll or pinch</strong> to zoom.</span></li>
-      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span><strong>Story points</strong> (top left) ticks off each point after you open it and watch most of its videos.</span></li>
+      <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg><span><strong>Story points</strong> (top left) tracks your progress as you explore each point and its accompanying media.</span></li>
     </ul>
     <div class="intro-foot">
       <div id="iMeta" aria-live="polite"></div>
@@ -699,7 +704,7 @@ function checkPoint(i) {
   const required = requiredVideos.get(i);
   if (required && required.every(key => watchedVideos.has(videoKey(i, key)))) {
     state.visited.add(i);
-  }
+  } else { state.visited.delete(i); }
   updatePoints();
 }
 function reportProgress() {
@@ -717,7 +722,7 @@ const VIDEO_COMPLETION = 0.18;
 function trackVideo(v, point, key) {
   const id = videoKey(point, key);
   function update() {
-    if (watchedVideos.has(id) || !Number.isFinite(v.duration) || v.duration <= 0) return;
+    if (!v.isConnected || watchedVideos.has(id) || !Number.isFinite(v.duration) || v.duration <= 0) return;
     const ranges = (videoCoverage.get(id) || []).slice();
     for (let j = 0; j < v.played.length; j++) ranges.push([v.played.start(j), v.played.end(j)]);
     ranges.sort((a,b) => a[0]-b[0]);
@@ -780,7 +785,7 @@ function onAnnotationSelect(index) {
     const a = (!err && annotation) ? annotation : state.list[index];
     if (!a || index !== state.current) return;
     const cardInfo = parseAnnotation(a, index);
-    requiredVideos.set(index, cardInfo.items.filter(it => it.kind === "video").map(it => mediaInfo(it.src).key));
+    requiredVideos.set(index, cardInfo.items.map(it => it.kind + "|" + mediaInfo(it.src).key));
     showCard(cardInfo);
     checkPoint(index);
   });
@@ -880,7 +885,7 @@ function renderRich(t) {
 
 function clearStudyVideos() {
   const panel = $("studyVideos");
-  panel.querySelectorAll("video").forEach(v => { v.pause(); v.removeAttribute("src"); v.load(); });
+  panel.querySelectorAll("video, audio").forEach(v => { v.pause(); v.removeAttribute("src"); v.load(); });
   panel.replaceChildren();
   panel.hidden = true;
   duck("duckModal", false);
@@ -888,7 +893,7 @@ function clearStudyVideos() {
 function refreshStudyVideoStatus() {
   $("studyVideos").querySelectorAll(".study-video-status").forEach(label => {
     const done = watchedVideos.has(label.dataset.key);
-    label.textContent = done ? "✓ Viewed" : "";
+    if (done) label.textContent = "✓ Viewed";
     label.classList.toggle("done", done);
   });
 }
@@ -898,34 +903,53 @@ function renderStudyVideos(cardInfo) {
   // Duplicate annotation events must not interrupt an active video.
   if (!panel.hidden && panel.dataset.point === String(point)) return;
   clearStudyVideos();
-  const videos = cardInfo.items.filter(item => item.kind === "video");
+  const videos = cardInfo.items;
   if (!videos.length) return;
   panel.dataset.point = String(point);
   panel.hidden = false;
   videos.forEach(item => {
     const info = mediaInfo(item.src);
+    const key = item.kind + "|" + info.key;
     const box = document.createElement("div"); box.className = "study-video";
     const title = document.createElement("p"); title.className = "study-video-title"; title.textContent = item.label;
-    const status = document.createElement("p"); status.className = "study-video-status"; status.dataset.key = videoKey(point, info.key);
+    const status = document.createElement("p"); status.className = "study-video-status"; status.dataset.key = videoKey(point, key);
+    const done = () => { if (!box.isConnected || state.current !== point) return; watchedVideos.add(videoKey(point,key)); checkPoint(point); refreshStudyVideoStatus(); };
+    const fail = () => { status.textContent = "Media unavailable. Please contact the researcher."; };
     box.append(title);
-    if (info.embed) {
+    if (item.kind === "link") {
+      const preview = document.createElement("div"); preview.className = "study-link-preview";
+      let url; try { url = new URL(info.url, location.href); } catch(e) {}
+      if (url && /^https?:$/.test(url.protocol)) {
+        const source = document.createElement("strong"); source.textContent = url.hostname;
+        const desc = document.createElement("p");
+        const unitree = /(^|\.)unitree\.com$/i.test(url.hostname);
+        desc.textContent = unitree ? "Unitree G1 — The manufacturer describes a humanoid robot with articulated joints, depth sensing and 3D LiDAR. Available capabilities vary by model and configuration." : item.label;
+        const link = document.createElement("a"); link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Visit website (optional)";
+        preview.append(source, desc, link); box.append(preview);
+        requestAnimationFrame(done);
+      } else { fail(); }
+    } else if (item.kind === "image" && !info.embed) {
+      const img = document.createElement("img"); img.alt = item.label;
+      img.addEventListener("load", done); img.addEventListener("error", fail);
+      box.append(img); img.src = info.url;
+      if (img.complete && img.naturalWidth) requestAnimationFrame(done);
+    } else if (info.embed) {
       const frame = makeFrame(info.embed.replace(/([?&])autoplay=1/g, "$1autoplay=0"), item.label);
       box.append(frame);
       const confirm = document.createElement("button");
-      confirm.type = "button"; confirm.className = "chip"; confirm.textContent = "I have watched this video";
-      confirm.addEventListener("click", () => { watchedVideos.add(videoKey(point, info.key)); checkPoint(point); refreshStudyVideoStatus(); });
-      box.append(confirm);
+      confirm.type = "button"; confirm.className = "chip"; confirm.textContent = "Mark as viewed";
+      confirm.addEventListener("click", done); box.append(confirm);
     } else {
-      const v = document.createElement("video");
+      const v = document.createElement(item.kind === "audio" ? "audio" : "video");
       v.controls = true; v.autoplay = false; v.playsInline = true; v.preload = "metadata";
       v.setAttribute("aria-label", item.label);
-      const syncDuck = () => duck("duckModal", [...panel.querySelectorAll("video")].some(el => !el.paused && !el.ended));
+      const syncDuck = () => duck("duckModal", [...panel.querySelectorAll("video, audio")].some(el => !el.paused && !el.ended));
       v.addEventListener("play", () => {
-        narr.pause(); panel.querySelectorAll("video").forEach(other => { if (other !== v) other.pause(); }); syncDuck();
+        narr.pause(); panel.querySelectorAll("video, audio").forEach(other => { if (other !== v) other.pause(); }); syncDuck();
       });
       v.addEventListener("pause", syncDuck); v.addEventListener("ended", syncDuck);
-      v.addEventListener("error", () => { syncDuck(); notice("A required video could not load. Please contact the researcher."); });
-      trackVideo(v, point, info.key);
+      v.addEventListener("error", () => { syncDuck(); fail(); });
+      trackVideo(v, point, key);
       v.src = info.url; box.append(v);
     }
     box.append(status); panel.append(box);
@@ -940,21 +964,7 @@ function showCard(info) {
   const ul = $("cMedia");
   ul.innerHTML = "";
   renderStudyVideos(info);
-  if (info.items.some(it => it.kind === "video") && window.innerWidth > 640 && window.innerWidth <= 950) setCollapsed(true);
-  info.items.filter(item => item.kind !== "video").forEach((item) => {
-    const li = document.createElement("li");
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "media-btn";
-    btn.dataset.key = mediaInfo(item.src).key;
-    btn.dataset.kind = item.kind;
-    btn.innerHTML = '<span class="media-ico">' + ICONS[item.kind] + "</span>" +
-      '<span class="media-text"><span class="media-label">' + esc(item.label) + "</span>" +
-      '<span class="media-kind">' + actionText(item.kind, btn.dataset.key) + "</span></span>";
-    btn.addEventListener("click", () => openItem(item));
-    li.appendChild(btn);
-    ul.appendChild(li);
-  });
+  if (info.items.length && window.innerWidth > 640 && window.innerWidth <= 950) setCollapsed(true);
   $("card").hidden = false;
   syncAudioButtons();
   updatePoints();
