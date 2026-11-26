@@ -214,6 +214,15 @@ button { cursor: pointer; }
   .card, #player { animation: rise .18s ease-out; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
+/* Study video panel: beside story text on wide screens, stacked on narrow screens. */
+#studyVideos { position: fixed; top: calc(72px + env(safe-area-inset-top, 0px)); right: 392px; width: min(420px, calc(100vw - 715px)); z-index: 12; padding: 12px; background: var(--paper); border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); max-height: calc(100vh - 150px); overflow: auto; }
+#studyVideos video { display: block; width: 100%; max-height: 38vh; background: #000; border-radius: 8px; }
+.study-video { margin-bottom: 12px; }
+.study-video:last-child { margin-bottom: 0; }
+.study-video-title { font-weight: 700; margin: 0 0 5px; }
+.study-video-status { font-size: 13px; margin: 5px 0 0; color: var(--muted); }
+.study-video-status.done { color: #1c6b36; font-weight: 700; }
+@media (max-width: 1100px) { #studyVideos { position: static; width: auto; max-height: 35vh; } }
 </style>
 </head>
 
@@ -262,6 +271,7 @@ button { cursor: pointer; }
     <div class="card-body" id="cBody"></div>
     <ul class="media" id="cMedia"></ul>
   </article>
+  <section id="studyVideos" hidden aria-label="Required videos"></section>
   <div id="player" hidden>
     <button class="round" id="pPlay" aria-label="Pause"></button>
     <div class="p-main">
@@ -693,6 +703,7 @@ function trackVideo(v, point, key) {
     watchedVideos.add(videoKey(point, key));
     checkPoint(point);
     if (state.current === point) {
+      refreshStudyVideoStatus();
       document.querySelectorAll('.media-btn[data-kind="video"]').forEach(b => {
         b.querySelector(".media-kind").textContent = actionText("video", b.dataset.key);
       });
@@ -716,7 +727,7 @@ $("ptReset").addEventListener("click", () => { $("ptFoot").hidden = true; $("ptC
 $("ptNo").addEventListener("click", () => { $("ptConfirm").hidden = true; $("ptFoot").hidden = false; $("ptReset").focus(); });
 $("ptYes").addEventListener("click", () => {
   $("ptConfirm").hidden = true; $("ptFoot").hidden = false;
-  stopAudio(); closeModal();
+  stopAudio(); closeModal(); clearStudyVideos();
   state.visited.clear();
   state.current = -1;
   requiredVideos.clear();
@@ -733,7 +744,7 @@ $("ptHelp").addEventListener("click", () => openIntro("help"));
 /* ================================================================== */
 function onAnnotationSelect(index) {
   if (!state.begun || typeof index !== "number" || index < 0 || index >= state.list.length || !state.api) return;
-  if (index !== state.current) stopAudio();
+  if (index !== state.current) { stopAudio(); clearStudyVideos(); }
   state.current = index;
   updatePoints();
 
@@ -838,13 +849,65 @@ function renderRich(t) {
     });
 }
 
+
+function clearStudyVideos() {
+  const panel = $("studyVideos");
+  panel.querySelectorAll("video").forEach(v => { v.pause(); v.removeAttribute("src"); v.load(); });
+  panel.replaceChildren();
+  panel.hidden = true;
+  duck("duckModal", false);
+}
+function refreshStudyVideoStatus() {
+  $("studyVideos").querySelectorAll(".study-video-status").forEach(label => {
+    const done = watchedVideos.has(label.dataset.key);
+    label.textContent = done ? "✓ Video completed" : "Required — play the full video";
+    label.classList.toggle("done", done);
+  });
+}
+function renderStudyVideos(cardInfo) {
+  const panel = $("studyVideos");
+  const point = cardInfo.number - 1;
+  // Duplicate annotation events must not interrupt an active video.
+  if (!panel.hidden && panel.dataset.point === String(point)) return;
+  clearStudyVideos();
+  const videos = cardInfo.items.filter(item => item.kind === "video");
+  if (!videos.length) return;
+  panel.dataset.point = String(point);
+  panel.hidden = false;
+  videos.forEach(item => {
+    const info = mediaInfo(item.src);
+    const box = document.createElement("div"); box.className = "study-video";
+    const title = document.createElement("p"); title.className = "study-video-title"; title.textContent = item.label;
+    const status = document.createElement("p"); status.className = "study-video-status"; status.dataset.key = videoKey(point, info.key);
+    box.append(title);
+    if (info.embed) {
+      const error = document.createElement("p"); error.textContent = "This video requires a direct MP4 or WebM file. Please contact the researcher."; box.append(error);
+    } else {
+      const v = document.createElement("video");
+      v.controls = true; v.autoplay = false; v.playsInline = true; v.preload = "metadata";
+      v.setAttribute("aria-label", item.label);
+      const syncDuck = () => duck("duckModal", [...panel.querySelectorAll("video")].some(el => !el.paused && !el.ended));
+      v.addEventListener("play", () => {
+        narr.pause(); panel.querySelectorAll("video").forEach(other => { if (other !== v) other.pause(); }); syncDuck();
+      });
+      v.addEventListener("pause", syncDuck); v.addEventListener("ended", syncDuck);
+      v.addEventListener("error", () => { syncDuck(); notice("A required video could not load. Please contact the researcher."); });
+      trackVideo(v, point, info.key);
+      v.src = info.url; box.append(v);
+    }
+    box.append(status); panel.append(box);
+  });
+  refreshStudyVideoStatus();
+}
+
 function showCard(info) {
   $("cNum").textContent = info.number;
   $("cTitle").textContent = info.title;
   $("cBody").innerHTML = renderText(info.text);
   const ul = $("cMedia");
   ul.innerHTML = "";
-  info.items.forEach((item) => {
+  renderStudyVideos(info);
+  info.items.filter(item => item.kind !== "video").forEach((item) => {
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.type = "button";
@@ -872,6 +935,7 @@ function actionText(kind, key) {
 
 $("cClose").addEventListener("click", () => {
   $("card").hidden = true;
+  clearStudyVideos();
   state.current = -1;
   updatePoints();
   if (state.api) { try { state.api.unselectAnnotation(function () {}); } catch (e) {} }
@@ -1008,6 +1072,7 @@ const narr = new Audio();
 narr.preload = "auto";
 
 function toggleNarration(item, info) {
+  $("studyVideos").querySelectorAll("video").forEach(v => v.pause());
   if (state.audioKey === info.key) { if (narr.paused) playNarration(); else narr.pause(); return; }
   stopAudio();
   state.audioKey = info.key;
@@ -1088,6 +1153,7 @@ $("pSeek").addEventListener("change", () => { seeking = false; });
 let lastFocus = null;
 
 function openModal(item, info) {
+  $("studyVideos").querySelectorAll("video").forEach(v => v.pause());
   if (!narr.paused) narr.pause();
   lastFocus = document.activeElement;
   const stage = $("stage");
@@ -1114,7 +1180,7 @@ function openModal(item, info) {
     stage.appendChild(makeFrame(info.embed, item.label));
   } else if (item.kind === "video") {
     const v = document.createElement("video");
-    v.controls = true; v.autoplay = true; v.playsInline = true;
+    v.controls = true; v.autoplay = false; v.playsInline = true;
     v.onerror = missing;
     v.addEventListener("play", () => duck("duckModal", true));
     v.addEventListener("pause", () => duck("duckModal", false));
