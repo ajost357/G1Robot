@@ -262,6 +262,23 @@ button { cursor: pointer; }
 #studyVideos .study-play { z-index:3; width:80px; height:80px; }
 #studyVideos .study-play svg { width:38px; height:38px; }
 #studyVideos .study-video-frame:not(.handshake) video { aspect-ratio:auto; min-height:110px; }
+
+/* Keep the white media card snug around portrait clips. */
+#studyVideos:has(.study-video-frame:is(.portrait, .handshake)) {
+  padding: 0; background: transparent; box-shadow: none;
+}
+#studyVideos:has(.study-video-frame:is(.portrait, .handshake)) .study-video {
+  background: var(--paper); border-radius: 12px; padding: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+}
+#studyVideos .study-video:has(.study-video-frame:is(.portrait, .handshake)) {
+  width: min(100%, calc(var(--clip-width, 191px) + 20px));
+  margin-inline: auto; overflow-wrap: anywhere;
+}
+#studyVideos .study-video:has(.study-video-frame:is(.portrait, .handshake)) .study-video-title {
+  overflow-wrap: anywhere;
+}
+
 </style>
 </head>
 
@@ -799,7 +816,7 @@ function remindIfUnfinished() {
   const toast = $("studyToast");
   toast.textContent = "Please explore all story points and their accompanying media before continuing the study.";
   toast.hidden = false;
-  setTimeout(() => { toast.hidden = true; }, 6500);
+  setTimeout(() => { toast.hidden = true; }, 3000);
 }
 function onAnnotationSelect(index) {
   if (!state.begun || typeof index !== "number" || index < 0 || index >= state.list.length || !state.api) return;
@@ -998,6 +1015,7 @@ function renderStudyVideos(cardInfo) {
           const ratio = v.videoWidth / v.videoHeight;
           frame.classList.toggle("portrait", ratio < 1);
           frame.style.setProperty("--portrait-width", Math.round(340 * ratio) + "px");
+          if (ratio < 1) box.style.setProperty("--clip-width", Math.round(340 * ratio) + "px");
           if (handshake) {
             frame.classList.toggle("native-portrait", ratio < 1);
             if (ratio < 1) {
